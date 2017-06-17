@@ -292,6 +292,7 @@ public abstract class ReleaseAction<P extends AbstractProject & BuildableItem,
                 resp.setStatus(StaplerResponse.SC_INTERNAL_SERVER_ERROR);
             } else {
                 String url = req.getContextPath() + '/' + item.getUrl();
+                resp.addHeader("X-Release-Version", getReleaseVersion());
                 resp.sendRedirect(201, url);
             }
         } catch (Exception e) {
