@@ -3,11 +3,12 @@ package org.jfrog.hudson.pipeline.docker.utils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.model.AuthConfig;
+import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientBuilder;
 import com.github.dockerjava.core.DockerClientConfig;
-import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.command.PullImageResultCallback;
 import com.github.dockerjava.core.command.PushImageResultCallback;
+import com.github.dockerjava.netty.NettyDockerCmdExecFactory;
 import com.google.common.base.Charsets;
 import com.google.common.hash.Hashing;
 import org.apache.commons.lang.StringUtils;
@@ -23,73 +24,86 @@ import java.util.List;
  */
 public class DockerUtils implements Serializable {
 
-    public static boolean isDockerHostExists(String host) {
+    /**
+     * Get image Id from imageTag using DockerBuildInfoHelper client.
+     *
+     * @param imageTag
+     * @param host
+     * @return
+     */
+    public static String getImageIdFromTag(String imageTag, String host) throws IOException {
+        DockerClient dockerClient = null;
         try {
-            DockerClient dockerClient = getDockerClient(host);
-            dockerClient.pingCmd().exec();
-            return true;
-        } catch (Exception e) {
-            return false;
+            dockerClient = getDockerClient(host);
+            return dockerClient.inspectImageCmd(imageTag).exec().getId();
+        } finally {
+            closeQuietly(dockerClient);
         }
     }
 
     /**
-     * Get image Id from imageTag using DockerBuildInfoHelper client
+     * Push docker image using the docker java client.
      *
      * @param imageTag
-     * @return
-     */
-    public static String getImageIdFromTag(String imageTag, String host) {
-        DockerClient dockerClient = getDockerClient(host);
-        return dockerClient.inspectImageCmd(imageTag).exec().getId();
-    }
-
-    /**
-     * Push docker image using the docker java client
-     *
-     * @param imageTag
-     * @param authConfig
+     * @param username
+     * @param password
      * @param host
      */
-    public static void pushImage(String imageTag, String username, String password, String host) {
+    public static void pushImage(String imageTag, String username, String password, String host) throws IOException {
         final AuthConfig authConfig = new AuthConfig();
         authConfig.withUsername(username);
         authConfig.withPassword(password);
 
-        DockerClient dockerClient = getDockerClient(host);
-        dockerClient.pushImageCmd(imageTag).withAuthConfig(authConfig).exec(new PushImageResultCallback()).awaitSuccess();
+        DockerClient dockerClient = null;
+        try {
+            dockerClient = getDockerClient(host);
+            dockerClient.pushImageCmd(imageTag).withAuthConfig(authConfig).exec(new PushImageResultCallback()).awaitSuccess();
+        } finally {
+            closeQuietly(dockerClient);
+        }
     }
 
     /**
-     * Pull docker image using the docker java client
+     * Pull docker image using the docker java client.
      *
      * @param imageTag
-     * @param authConfig
+     * @param username
+     * @param password
      * @param host
      */
-    public static void pullImage(String imageTag, String username, String password, String host) {
+    public static void pullImage(String imageTag, String username, String password, String host) throws IOException {
         final AuthConfig authConfig = new AuthConfig();
         authConfig.withUsername(username);
         authConfig.withPassword(password);
 
-        DockerClient dockerClient = getDockerClient(host);
-        dockerClient.pullImageCmd(imageTag).withAuthConfig(authConfig).exec(new PullImageResultCallback()).awaitSuccess();
+        DockerClient dockerClient = null;
+        try {
+            dockerClient = getDockerClient(host);
+            dockerClient.pullImageCmd(imageTag).withAuthConfig(authConfig).exec(new PullImageResultCallback()).awaitSuccess();
+        } finally {
+            closeQuietly(dockerClient);
+        }
     }
 
     /**
-     * Get parent digest of an image
+     * Get parent digest of an image.
      *
      * @param digest
      * @param host
      * @return
      */
-    public static String getParentId(String digest, String host) {
-        DockerClient dockerClient = getDockerClient(host);
-        return dockerClient.inspectImageCmd(digest).exec().getParent();
+    public static String getParentId(String digest, String host) throws IOException {
+        DockerClient dockerClient = null;
+        try {
+            dockerClient = getDockerClient(host);
+            return dockerClient.inspectImageCmd(digest).exec().getParent();
+        } finally {
+            closeQuietly(dockerClient);
+        }
     }
 
     /**
-     * Get config digest from manifest (image id)
+     * Get config digest from manifest (image id).
      *
      * @param manifest
      * @return
@@ -97,6 +111,14 @@ public class DockerUtils implements Serializable {
      */
     public static String getConfigDigest(String manifest) throws IOException {
         JsonNode manifestTree = Utils.mapper().readTree(manifest);
+        JsonNode schemaVersion = manifestTree.get("schemaVersion");
+        if (schemaVersion == null) {
+            throw new IllegalStateException("Could not find 'schemaVersion' in manifest");
+        }
+        if (schemaVersion.asInt() == 1) {
+            throw new IllegalStateException("Docker build info is not supported for docker V1 images");
+        }
+
         JsonNode config = manifestTree.get("config");
         if (config == null) {
             throw new IllegalStateException("Could not find 'config' in manifest");
@@ -111,10 +133,11 @@ public class DockerUtils implements Serializable {
     }
 
     /**
-     * Get a list of layer digests from docker manifest
+     * Get a list of layer digests from docker manifest.
      *
      * @param manifestContent
      * @return
+     * @throws IOException
      */
     public static List<String> getLayersDigests(String manifestContent) throws IOException {
         List<String> dockerLayersDependencies = new ArrayList<String>();
@@ -141,11 +164,11 @@ public class DockerUtils implements Serializable {
     }
 
     /**
-     * return blob sum depend on scheme version
+     * Return blob sum depend on scheme version.
      *
-     * @param isSchemeVersion1 - if true scheme version 1
-     * @param manifest         - docker manifest
-     * @return - layer element
+     * @param manifest
+     * @param isSchemeVersion1
+     * @return
      */
     private static JsonNode getFsLayers(JsonNode manifest, boolean isSchemeVersion1) {
         JsonNode fsLayers;
@@ -162,11 +185,11 @@ public class DockerUtils implements Serializable {
     }
 
     /**
-     * return blob sum depend on scheme version
+     * Return blob sum depend on scheme version.
      *
-     * @param isSchemeVersion1 - if true scheme version 1
-     * @param fsLayer          - docker layers
-     * @return - manifest element
+     * @param isSchemeVersion1
+     * @param fsLayer
+     * @return
      */
     private static JsonNode getBlobSum(boolean isSchemeVersion1, JsonNode fsLayer) {
         JsonNode blobSum;
@@ -184,8 +207,8 @@ public class DockerUtils implements Serializable {
     }
 
     /**
-     * Get sha value from digest
-     * example: sha256:abcabcabc12334 the value is abcabcabc12334
+     * Get sha value from digest.
+     * example: sha256:abcabcabc12334 the value is abcabcabc12334.
      *
      * @param digest
      * @return
@@ -195,8 +218,8 @@ public class DockerUtils implements Serializable {
     }
 
     /**
-     * Get sha value from digest
-     * example: sha256:abcabcabc12334 the value is sha256
+     * Get sha value from digest.
+     * example: sha256:abcabcabc12334 the value is sha256.
      *
      * @param digest
      * @return
@@ -207,7 +230,7 @@ public class DockerUtils implements Serializable {
 
     /**
      * Parse imageTag and get the relative path of the pushed image.
-     * example: url:8081/image:version to image/version
+     * example: url:8081/image:version to image/version.
      *
      * @param imageTag
      * @return
@@ -235,7 +258,7 @@ public class DockerUtils implements Serializable {
     }
 
     /**
-     * layer file name to digest format
+     * Layer file name to digest format.
      *
      * @param fileName
      * @return
@@ -245,7 +268,7 @@ public class DockerUtils implements Serializable {
     }
 
     /**
-     * digest format to layer file name
+     * Digest format to layer file name.
      *
      * @param digest
      * @return
@@ -296,13 +319,26 @@ public class DockerUtils implements Serializable {
     }
 
     private static DockerClient getDockerClient(String host) {
+        NettyDockerCmdExecFactory nettyDockerCmdExecFactory = null;
+
+        nettyDockerCmdExecFactory = new NettyDockerCmdExecFactory();
         if (StringUtils.isEmpty(host)) {
-            return DockerClientBuilder.getInstance().build();
+            return DockerClientBuilder.getInstance().withDockerCmdExecFactory(nettyDockerCmdExecFactory).build();
         }
 
         DockerClientConfig config = DefaultDockerClientConfig.createDefaultConfigBuilder()
                 .withDockerHost(host)
                 .build();
-        return DockerClientBuilder.getInstance(config).build();
+        return DockerClientBuilder.getInstance(config).withDockerCmdExecFactory(nettyDockerCmdExecFactory).build();
+    }
+
+    private static void closeQuietly(DockerClient dockerClient) {
+        if (dockerClient != null) {
+            try {
+                dockerClient.close();
+            } catch (IOException e) {
+                // Ignore
+            }
+        }
     }
 }

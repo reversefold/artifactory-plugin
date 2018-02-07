@@ -49,10 +49,7 @@ import org.jfrog.hudson.util.publisher.PublisherContext;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 
 /**
  * @author Tomer Cohen
@@ -64,6 +61,7 @@ public class ExtractorUtils {
      * Jenkins.
      */
     public static final String EXTRACTOR_USED = "extractor.used";
+    public static final String GIT_COMMIT = "GIT_COMMIT";
 
     private ExtractorUtils() {
         // utility class
@@ -80,7 +78,7 @@ public class ExtractorUtils {
     public static String getVcsRevision(Map<String, String> env) {
         String revision = env.get("SVN_REVISION");
         if (StringUtils.isBlank(revision)) {
-            revision = env.get("GIT_COMMIT");
+            revision = env.get(GIT_COMMIT);
         }
         if (StringUtils.isBlank(revision)) {
             revision = env.get("P4_CHANGELIST");
@@ -304,16 +302,17 @@ public class ExtractorUtils {
         configuration.info.setAgentName("Jenkins");
         configuration.info.setAgentVersion(Jenkins.VERSION);
         ArtifactoryServer artifactoryServer = context.getArtifactoryServer();
-        CredentialsConfig preferredDeployer =
-                CredentialManager.getPreferredDeployer(context.getDeployerOverrider(), artifactoryServer);
-        if (StringUtils.isNotBlank(preferredDeployer.provideUsername(build.getParent()))) {
-            configuration.publisher.setUsername(preferredDeployer.provideUsername(build.getParent()));
-            configuration.publisher.setPassword(preferredDeployer.providePassword(build.getParent()));
-        }
-        configuration.setTimeout(artifactoryServer.getTimeout());
-        setRetryParams(configuration, artifactoryServer);
+        if (artifactoryServer != null) {
+            CredentialsConfig preferredDeployer = CredentialManager.getPreferredDeployer(context.getDeployerOverrider(), artifactoryServer);
+            if (StringUtils.isNotBlank(preferredDeployer.provideUsername(build.getParent()))) {
+                configuration.publisher.setUsername(preferredDeployer.provideUsername(build.getParent()));
+                configuration.publisher.setPassword(preferredDeployer.providePassword(build.getParent()));
+            }
+            configuration.setTimeout(artifactoryServer.getTimeout());
+            setRetryParams(configuration, artifactoryServer);
 
-        configuration.publisher.setContextUrl(artifactoryServer.getUrl());
+            configuration.publisher.setContextUrl(artifactoryServer.getUrl());
+        }
 
         ServerDetails serverDetails = context.getServerDetails();
         if (serverDetails != null) {
@@ -365,8 +364,12 @@ public class ExtractorUtils {
         }
         configuration.publisher.setPublishArtifacts(context.isDeployArtifacts());
         configuration.publisher.setEvenUnstable(context.isEvenIfUnstable());
-        configuration.publisher.setIvy(context.isDeployIvy());
-        configuration.publisher.setMaven(context.isDeployMaven());
+        if (context.isDeployIvy() != null) {
+            configuration.publisher.setIvy(context.isDeployIvy());
+        }
+        if (context.isDeployMaven() != null) {
+            configuration.publisher.setMaven(context.isDeployMaven());
+        }
         IncludesExcludes deploymentPatterns = context.getIncludesExcludes();
         if (deploymentPatterns != null) {
             String includePatterns = deploymentPatterns.getIncludePatterns();
@@ -455,7 +458,7 @@ public class ExtractorUtils {
 
     public static void persistConfiguration(ArtifactoryClientConfiguration configuration, Map<String, String> env, FilePath ws,
                                             hudson.Launcher launcher) throws IOException, InterruptedException {
-        FilePath propertiesFile = ws.createTextTempFile("buildInfo", ".properties", "", false);
+        FilePath propertiesFile = ws.createTextTempFile("buildInfo", ".properties", "");
         ActionableHelper.deleteFilePathOnExit(propertiesFile);
         configuration.setPropertiesFile(propertiesFile.getRemote());
         env.put("BUILDINFO_PROPFILE", propertiesFile.getRemote());
@@ -479,6 +482,25 @@ public class ExtractorUtils {
                 throw new RuntimeException(e);
             }
         }
+    }
+
+    public static String buildPropertiesString(ArrayListMultimap<String, String> properties) {
+        StringBuilder props = new StringBuilder();
+        List<String> keys = new ArrayList<String>(properties.keySet());
+        for (int i = 0; i < keys.size(); i++) {
+            props.append(keys.get(i)).append("=");
+            List<String> values = properties.get(keys.get(i));
+            for (int j = 0; j < values.size(); j++) {
+                props.append(values.get(j));
+                if (j != values.size() - 1) {
+                    props.append(",");
+                }
+            }
+            if (i != keys.size() - 1) {
+                props.append(";");
+            }
+        }
+        return props.toString();
     }
 
     private static Computer getComputer(hudson.Launcher launcher) {

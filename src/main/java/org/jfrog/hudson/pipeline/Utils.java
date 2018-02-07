@@ -10,10 +10,14 @@ import hudson.plugins.git.util.BuildData;
 import hudson.remoting.Callable;
 import hudson.remoting.Channel;
 import hudson.remoting.LocalChannel;
+import hudson.remoting.VirtualChannel;
 import hudson.util.ArgumentListBuilder;
 import hudson.util.ListBoxModel;
 import jenkins.model.Jenkins;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.StringUtils;
+import org.eclipse.jgit.internal.storage.file.FileRepository;
+import org.eclipse.jgit.lib.Ref;
 import org.jfrog.build.api.Vcs;
 import org.jfrog.build.extractor.clientConfiguration.IncludeExcludePatterns;
 import org.jfrog.hudson.CredentialsConfig;
@@ -38,6 +42,7 @@ public class Utils {
 
     public static final String BUILD_INFO_DELIMITER = ".";
     public static final String CONAN_USER_HOME = "CONAN_USER_HOME";
+    private static final String UNIX_GLOB_CHARS = "*?[]";
 
     /**
      * Prepares Artifactory server either from serverID or from ArtifactoryServer.
@@ -129,16 +134,21 @@ public class Utils {
         return result;
     }
 
-    public static Node getNode(Launcher launcher) {
-        Node node = null;
-        Jenkins j = Jenkins.getInstance();
-        for (Computer c : j.getComputers()) {
-            if (c.getChannel() == launcher.getChannel()) {
-                node = c.getNode();
-                break;
-            }
+    public static String extractVcsRevision(FilePath filePath) throws IOException, InterruptedException {
+        if (filePath == null) {
+            return "";
         }
-        return node;
+        FilePath dotGitPath = new FilePath(filePath, ".git");
+        if (dotGitPath.exists()) {
+            return dotGitPath.act(new FilePath.FileCallable<String>() {
+                public String invoke(File f, VirtualChannel channel) throws IOException, InterruptedException {
+                    FileRepository repository = new FileRepository(f);
+                    Ref head = repository.getRef("HEAD");
+                    return head.getObjectId().getName();
+                }
+            });
+        }
+        return extractVcsRevision(filePath.getParent());
     }
 
     public static Computer getCurrentComputer(Launcher launcher) {
@@ -160,13 +170,13 @@ public class Utils {
         StringBuilder include = new StringBuilder();
         StringBuilder exclude = new StringBuilder();
         for (int i = 0; i < includePatterns.length; i++) {
-            if (i < includePatterns.length - 1 && include.length() > 0) {
+            if (include.length() > 0) {
                 include.append(", ");
             }
             include.append(includePatterns[i]);
         }
         for (int i = 0; i < excludePatterns.length; i++) {
-            if (i < excludePatterns.length - 1 && exclude.length() > 0) {
+            if (exclude.length() > 0) {
                 exclude.append(", ");
             }
             exclude.append(excludePatterns[i]);
@@ -185,8 +195,11 @@ public class Utils {
             generatedBuildInfoFilePath = new FilePath(launcher.getChannel(), jsonBuildPath);
             inputStream = generatedBuildInfoFilePath.read();
             IOUtils.copy(inputStream, writer, "UTF-8");
-            String theString = writer.toString();
-            return mapper.readValue(theString, org.jfrog.build.api.Build.class);
+            String buildInfoFileContent = writer.toString();
+            if (StringUtils.isBlank(buildInfoFileContent)) {
+                return new org.jfrog.build.api.Build();
+            }
+            return mapper.readValue(buildInfoFileContent, org.jfrog.build.api.Build.class);
         } catch (Exception e) {
             listener.error("Couldn't read generated build info at : " + jsonBuildPath);
             build.setResult(Result.FAILURE);
@@ -224,10 +237,10 @@ public class Utils {
         }
     }
 
-    public static String createTempJsonFile(Launcher launcher, final String name) throws Exception {
+    public static String createTempJsonFile(Launcher launcher, final String name, final String dir) throws Exception {
         return launcher.getChannel().call(new Callable<String, Exception>() {
             public String call() throws IOException {
-                File tempFile = File.createTempFile(name, ".json");
+                File tempFile = File.createTempFile(name, ".json", new File(dir));
                 tempFile.deleteOnExit();
                 return tempFile.getAbsolutePath();
             }
@@ -240,6 +253,22 @@ public class Utils {
             if (!pwd.exists()) {
                 pwd.mkdirs();
             }
+            if (launcher.isUnix()) {
+                boolean hasMaskedArguments = args.hasMaskedArguments();
+                StringBuilder sb = new StringBuilder();
+                for (String arg : args.toList()) {
+                    sb.append(escapeUnixArgument(arg)).append(" ");
+                }
+                args.clear();
+                args.add("sh", "-c");
+                if (hasMaskedArguments) {
+                    args.addMasked(sb.toString());
+                } else {
+                    args.add(sb.toString());
+                }
+            } else {
+                args = args.toWindowsCommand();
+            }
             int exitValue = launcher.launch().cmds(args).envs(env).stdout(listener).pwd(pwd).join();
             failed = (exitValue != 0);
         } catch (Exception e) {
@@ -251,6 +280,17 @@ public class Utils {
             build.setResult(Result.FAILURE);
             throw new Run.RunnerAbortedException();
         }
+    }
+
+    private static String escapeUnixArgument(String arg) {
+        StringBuilder res = new StringBuilder();
+        for (char c : arg.toCharArray()) {
+            if (UNIX_GLOB_CHARS.indexOf(c) >= 0) {
+                res.append("\\");
+            }
+            res.append(c);
+        }
+        return res.toString();
     }
 
     public static PromotionConfig createPromotionConfig(Map<String, Object> promotionParams, boolean isTargetRepositoryMandatory) {

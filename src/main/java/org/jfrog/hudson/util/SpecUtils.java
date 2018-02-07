@@ -14,17 +14,17 @@ import java.io.PrintStream;
  */
 public class SpecUtils {
 
-    public static String getSpecStringFromSpecConf(
-            SpecConfiguration specConfiguration, EnvVars env, FilePath workspace, PrintStream logger)
+    public static String getSpecStringFromSpecConf(SpecConfiguration specConfiguration, EnvVars env, FilePath workspace, PrintStream logger)
             throws IOException, InterruptedException {
 
         if (StringUtils.isNotBlank(specConfiguration.getFilePath())) {
             String filePath = specConfiguration.getFilePath().trim();
             filePath = Util.replaceMacro(filePath, env);
-            return buildDownloadSpecPath(filePath, workspace, logger).readToString();
+            String spec = buildDownloadSpecPath(filePath, workspace, logger).readToString();
+            return Util.replaceMacro(spec.trim(), env);
         }
         if (StringUtils.isNotBlank(specConfiguration.getSpec())) {
-            return specConfiguration.getSpec().trim();
+            return Util.replaceMacro(specConfiguration.getSpec().trim(), env);
         }
         return "";
     }

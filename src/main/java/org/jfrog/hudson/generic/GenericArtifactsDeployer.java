@@ -16,11 +16,13 @@ import org.jfrog.build.api.Artifact;
 import org.jfrog.build.api.BuildInfoFields;
 import org.jfrog.build.api.builder.ArtifactBuilder;
 import org.jfrog.build.api.util.FileChecksumCalculator;
+import org.jfrog.build.api.util.Log;
 import org.jfrog.build.client.DeployDetails;
 import org.jfrog.build.client.ProxyConfiguration;
 import org.jfrog.build.extractor.clientConfiguration.client.ArtifactoryBuildInfoClient;
 import org.jfrog.build.extractor.clientConfiguration.util.PublishedItemsHelper;
 import org.jfrog.build.extractor.clientConfiguration.util.spec.SpecsHelper;
+import org.jfrog.build.extractor.clientConfiguration.util.spec.UploadSpecHelper;
 import org.jfrog.hudson.ArtifactoryServer;
 import org.jfrog.hudson.CredentialsConfig;
 import org.jfrog.hudson.action.ActionableHelper;
@@ -70,8 +72,7 @@ public class GenericArtifactsDeployer {
         ArtifactoryServer artifactoryServer = configurator.getArtifactoryServer();
 
         if (configurator.isUseSpecs()) {
-            String spec = Util.replaceMacro(SpecUtils.getSpecStringFromSpecConf(
-                            configurator.getUploadSpec(), env, workingDir, listener.getLogger()) , env);
+            String spec = SpecUtils.getSpecStringFromSpecConf(configurator.getUploadSpec(), env, workingDir, listener.getLogger());
             artifactsToDeploy = workingDir.act(new FilesDeployerCallable(listener, spec, artifactoryServer,
                     credentialsConfig.getCredentials(build.getParent()), propertiesToAdd,
                     artifactoryServer.createProxyConfiguration(Jenkins.getInstance().proxy)));
@@ -178,11 +179,12 @@ public class GenericArtifactsDeployer {
 
         public List<Artifact> invoke(File workspace, VirtualChannel channel) throws IOException, InterruptedException {
             Set<DeployDetails> artifactsToDeploy;
+            Log log = new JenkinsBuildInfoLog(listener);
             ArtifactoryBuildInfoClient client = server.createArtifactoryClient(credentials.getUsername(),
-                    credentials.getPassword(), proxyConfiguration);
+                    credentials.getPassword(), proxyConfiguration, log);
             if (StringUtils.isNotEmpty(spec)) {
                 // Option 1. Upload - Use file specs.
-                SpecsHelper specsHelper = new SpecsHelper(new JenkinsBuildInfoLog(listener));
+                SpecsHelper specsHelper = new SpecsHelper(log);
                 try {
                     return specsHelper.uploadArtifactsBySpec(spec, workspace, buildProperties, client);
                 } catch (NoSuchAlgorithmException e) {
@@ -231,7 +233,6 @@ public class GenericArtifactsDeployer {
                     deploymentPathBuilder.append("/");
                 }
                 deploymentPathBuilder.append(deployDetail.getArtifactPath());
-                listener.getLogger().println("Deploying artifact: " + deploymentPathBuilder.toString());
                 client.deployArtifact(deployDetail);
             }
         }
@@ -245,10 +246,10 @@ public class GenericArtifactsDeployer {
                 String pattern = entry.getKey();
                 String targetPath = entry.getValue();
                 Multimap<String, File> publishingData =
-                        PublishedItemsHelper.buildPublishingData(workspace, pattern, targetPath);
+                    PublishedItemsHelper.buildPublishingData(workspace, pattern, targetPath);
 
                 if (publishingData != null) {
-                    listener.getLogger().println(
+                listener.getLogger().println(
                             "For pattern: " + pattern + " " + publishingData.size() + " artifacts were found");
                     result.putAll(publishingData);
                 } else {
@@ -268,7 +269,7 @@ public class GenericArtifactsDeployer {
             if (patternType == PatternType.ANT) {
                 path = PublishedItemsHelper.calculateTargetPath(targetPath, artifactFile);
             } else {
-                path = PublishedItemsHelper.wildcardCalculateTargetPath(targetPath, artifactFile);
+                path = UploadSpecHelper.wildcardCalculateTargetPath(targetPath, artifactFile);
             }
             path = StringUtils.replace(path, "//", "/");
 

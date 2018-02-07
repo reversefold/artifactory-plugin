@@ -35,7 +35,7 @@ import hudson.util.XStream2;
 import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
 import org.apache.commons.lang.StringUtils;
-import org.jfrog.gradle.plugin.artifactory.task.BuildInfoBaseTask;
+import org.jfrog.gradle.plugin.artifactory.task.ArtifactoryTask;
 import org.jfrog.hudson.*;
 import org.jfrog.hudson.BintrayPublish.BintrayPublishAction;
 import org.jfrog.hudson.action.ActionableHelper;
@@ -505,7 +505,7 @@ public class ArtifactoryGradleConfigurator extends BuildWrapper implements Deplo
                         setTargetsField(gradleBuild, "switches", switches + " " + "${ARTIFACTORY_INIT_SCRIPT}");
                     }
                     // Override the build tasks:
-                    if (!StringUtils.contains(gradleBuild.getTasks(), BuildInfoBaseTask.BUILD_INFO_TASK_NAME)) {
+                    if (!StringUtils.contains(gradleBuild.getTasks(), ArtifactoryTask.ARTIFACTORY_PUBLISH_TASK_NAME)) {
                         // In case we specified "alternative goals" in the release view we should override the build goals
                         if (isRelease(build) && StringUtils.isNotBlank(releaseWrapper.getAlternativeTasks())) {
                             tasks = "${ARTIFACTORY_TASKS}";
@@ -527,7 +527,7 @@ public class ArtifactoryGradleConfigurator extends BuildWrapper implements Deplo
 
             @Override
             public void buildEnvVars(Map<String, String> env) {
-                GradleInitScriptWriter writer = new GradleInitScriptWriter(build, launcher);
+                GradleInitScriptWriter writer = new GradleInitScriptWriter(ActionableHelper.getNode(launcher).getRootPath());
                 FilePath workspace = build.getWorkspace();
                 FilePath initScript;
                 try {
@@ -550,7 +550,7 @@ public class ArtifactoryGradleConfigurator extends BuildWrapper implements Deplo
                         tasks = alternativeGoals;
                     }
                 }
-                env.put("ARTIFACTORY_TASKS", tasks + " " + BuildInfoBaseTask.BUILD_INFO_TASK_NAME);
+                env.put("ARTIFACTORY_TASKS", tasks + " " + ArtifactoryTask.ARTIFACTORY_PUBLISH_TASK_NAME);
 
                 ServerDetails serverDetails = getDetails();
                 serverDetails = releaseActionOverride(env, serverDetails);
