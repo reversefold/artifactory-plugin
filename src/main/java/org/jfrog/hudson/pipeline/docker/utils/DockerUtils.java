@@ -24,19 +24,6 @@ import java.util.List;
  */
 public class DockerUtils implements Serializable {
 
-    public static boolean isDockerHostExists(String host) throws IOException {
-        DockerClient dockerClient = null;
-        try {
-            dockerClient = getDockerClient(host);
-            dockerClient.pingCmd().exec();
-            return true;
-        } catch (Exception e) {
-            return false;
-        } finally {
-            closeQuietly(dockerClient);
-        }
-    }
-
     /**
      * Get image Id from imageTag using DockerBuildInfoHelper client.
      *
@@ -115,16 +102,6 @@ public class DockerUtils implements Serializable {
         }
     }
 
-    private static void closeQuietly(DockerClient c) {
-        if (c != null) {
-            try {
-                c.close();
-            } catch (IOException e) {
-                // Ignore
-            }
-        }
-    }
-
     /**
      * Get config digest from manifest (image id).
      *
@@ -134,6 +111,14 @@ public class DockerUtils implements Serializable {
      */
     public static String getConfigDigest(String manifest) throws IOException {
         JsonNode manifestTree = Utils.mapper().readTree(manifest);
+        JsonNode schemaVersion = manifestTree.get("schemaVersion");
+        if (schemaVersion == null) {
+            throw new IllegalStateException("Could not find 'schemaVersion' in manifest");
+        }
+        if (schemaVersion.asInt() == 1) {
+            throw new IllegalStateException("Docker build info is not supported for docker V1 images");
+        }
+
         JsonNode config = manifestTree.get("config");
         if (config == null) {
             throw new IllegalStateException("Could not find 'config' in manifest");
@@ -334,7 +319,9 @@ public class DockerUtils implements Serializable {
     }
 
     private static DockerClient getDockerClient(String host) {
-        NettyDockerCmdExecFactory nettyDockerCmdExecFactory = new NettyDockerCmdExecFactory();
+        NettyDockerCmdExecFactory nettyDockerCmdExecFactory = null;
+
+        nettyDockerCmdExecFactory = new NettyDockerCmdExecFactory();
         if (StringUtils.isEmpty(host)) {
             return DockerClientBuilder.getInstance().withDockerCmdExecFactory(nettyDockerCmdExecFactory).build();
         }
@@ -343,5 +330,15 @@ public class DockerUtils implements Serializable {
                 .withDockerHost(host)
                 .build();
         return DockerClientBuilder.getInstance(config).withDockerCmdExecFactory(nettyDockerCmdExecFactory).build();
+    }
+
+    private static void closeQuietly(DockerClient dockerClient) {
+        if (dockerClient != null) {
+            try {
+                dockerClient.close();
+            } catch (IOException e) {
+                // Ignore
+            }
+        }
     }
 }

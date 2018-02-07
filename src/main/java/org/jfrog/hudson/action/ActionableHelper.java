@@ -18,6 +18,7 @@ package org.jfrog.hudson.action;
 
 import com.google.common.collect.Lists;
 import hudson.FilePath;
+import hudson.Launcher;
 import hudson.matrix.MatrixConfiguration;
 import hudson.maven.MavenBuild;
 import hudson.maven.reporters.MavenArtifactRecord;
@@ -27,6 +28,7 @@ import hudson.tasks.BuildWrapper;
 import hudson.tasks.Builder;
 import hudson.tasks.Publisher;
 import hudson.util.DescribableList;
+import jenkins.MasterToSlaveFileCallable;
 import jenkins.model.Jenkins;
 import org.apache.commons.lang.StringUtils;
 import org.jfrog.build.client.ArtifactoryHttpClient;
@@ -35,13 +37,15 @@ import org.jfrog.hudson.util.publisher.PublisherFlexible;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.Collections;
 import java.util.List;
 
 /**
  * @author Yossi Shaul
  */
-public abstract class ActionableHelper {
+public abstract class ActionableHelper implements Serializable {
+    private static final long serialVersionUID = 1L;
 
     public static MavenArtifactRecord getLatestMavenArtifactRecord(MavenBuild mavenBuild) {
         return getLatestAction(mavenBuild, MavenArtifactRecord.class);
@@ -276,11 +280,23 @@ public abstract class ActionableHelper {
      * @throws IOException In case of a missing file.
      */
     public static void deleteFilePathOnExit(FilePath filePath) throws IOException, InterruptedException {
-        filePath.act(new FilePath.FileCallable<Object>() {
-            public Object invoke(File file, VirtualChannel virtualChannel) throws IOException, InterruptedException {
+        filePath.act(new MasterToSlaveFileCallable<Void>() {
+            public Void invoke(File file, VirtualChannel virtualChannel) throws IOException, InterruptedException {
                 file.deleteOnExit();
                 return null;
             }
         });
+    }
+
+    public static Node getNode(Launcher launcher) {
+        Node node = null;
+        Jenkins j = Jenkins.getInstance();
+        for (Computer c : j.getComputers()) {
+            if (c.getChannel() == launcher.getChannel()) {
+                node = c.getNode();
+                break;
+            }
+        }
+        return node;
     }
 }

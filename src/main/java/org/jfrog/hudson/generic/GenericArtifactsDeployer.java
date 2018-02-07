@@ -9,6 +9,7 @@ import hudson.model.Cause;
 import hudson.model.Run;
 import hudson.model.TaskListener;
 import hudson.remoting.VirtualChannel;
+import jenkins.MasterToSlaveFileCallable;
 import jenkins.model.Jenkins;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang.StringUtils;
@@ -127,7 +128,7 @@ public class GenericArtifactsDeployer {
         }
     }
 
-    public static class FilesDeployerCallable implements FilePath.FileCallable<List<Artifact>> {
+    public static class FilesDeployerCallable extends MasterToSlaveFileCallable<List<Artifact>> {
 
         private String repositoryKey;
         private TaskListener listener;
@@ -233,7 +234,6 @@ public class GenericArtifactsDeployer {
                     deploymentPathBuilder.append("/");
                 }
                 deploymentPathBuilder.append(deployDetail.getArtifactPath());
-                listener.getLogger().println("Deploying artifact: " + deploymentPathBuilder.toString());
                 client.deployArtifact(deployDetail);
             }
         }

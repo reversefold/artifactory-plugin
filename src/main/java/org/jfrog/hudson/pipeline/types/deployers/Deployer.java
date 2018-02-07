@@ -5,6 +5,7 @@ import com.google.common.collect.Sets;
 import hudson.FilePath;
 import hudson.model.TaskListener;
 import hudson.remoting.VirtualChannel;
+import jenkins.MasterToSlaveFileCallable;
 import jenkins.model.Jenkins;
 import org.jenkinsci.plugins.scriptsecurity.sandbox.whitelists.Whitelisted;
 import org.jenkinsci.plugins.workflow.cps.CpsScript;
@@ -88,25 +89,6 @@ public abstract class Deployer implements DeployerOverrider, Serializable {
 
     public ArrayListMultimap<String, String> getProperties() {
         return this.properties;
-    }
-
-    protected String buildPropertiesString() {
-        StringBuilder props = new StringBuilder();
-        List<String> keys = new ArrayList<String>(properties.keySet());
-        for (int i = 0; i < keys.size(); i++) {
-            props.append(keys.get(i)).append("=");
-            List<String> values = properties.get(keys.get(i));
-            for (int j = 0; j < values.size(); j++) {
-                props.append(values.get(j));
-                if (j != values.size() - 1) {
-                    props.append(",");
-                }
-            }
-            if (i != keys.size() - 1) {
-                props.append(";");
-            }
-        }
-        return props.toString();
     }
 
     public boolean isOverridingDefaultDeployer() {
@@ -200,7 +182,7 @@ public abstract class Deployer implements DeployerOverrider, Serializable {
         }
     }
 
-    public static class DeployDetailsCallable implements FilePath.FileCallable<Set<DeployDetails>> {
+    public static class DeployDetailsCallable extends MasterToSlaveFileCallable<Set<DeployDetails>> {
         private static final String SHA1 = "SHA1";
         private static final String MD5 = "MD5";
         private List<DeployDetails> deployableArtifactsPaths;
