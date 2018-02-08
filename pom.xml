@@ -33,10 +33,10 @@
         <!-- Minimal version required by Pipeline dependencies in 2.14.0 -->
         <jenkins.version>1.642.3</jenkins.version>
         <java.level>7</java.level>
-        <buildinfo.version>2.9.2</buildinfo.version>
-        <buildinfo.maven3.version>2.9.2</buildinfo.maven3.version>
-        <buildinfo.gradle.version>4.6.0</buildinfo.gradle.version>
-        <buildinfo.ivy.version>2.9.2</buildinfo.ivy.version>
+        <buildinfo.version>2.9.x-SNAPSHOT</buildinfo.version>
+        <buildinfo.maven3.version>2.9.x-SNAPSHOT</buildinfo.maven3.version>
+        <buildinfo.gradle.version>4.6.x-SNAPSHOT</buildinfo.gradle.version>
+        <buildinfo.ivy.version>2.9.x-SNAPSHOT</buildinfo.ivy.version>
         <!-- TODO: enforcer is full of upper bound dependency issues, including real ones -->
         <enforcer.skip>true</enforcer.skip>
         <!-- TODO: uncomment once FindBugs issues are fixed -->
