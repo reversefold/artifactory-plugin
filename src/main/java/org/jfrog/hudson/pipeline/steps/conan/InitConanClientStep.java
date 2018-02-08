@@ -115,7 +115,7 @@ public class InitConanClientStep extends AbstractStepImpl {
 
         @Override
         public String getFunctionName() {
-            return "InitConanClient";
+            return "initConanClient";
         }
 
         @Override

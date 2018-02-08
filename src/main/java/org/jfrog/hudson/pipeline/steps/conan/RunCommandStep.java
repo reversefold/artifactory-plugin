@@ -41,19 +41,19 @@ public class RunCommandStep extends AbstractStepImpl {
     }
 
     public String getCommand() {
-        return command;
+        return this.command;
     }
 
     public String getConanHome() {
-        return conanHome;
+        return this.conanHome;
     }
 
     public BuildInfo getBuildInfo() {
-        return buildInfo;
+        return this.buildInfo;
     }
 
     public String getBuildLogPath() {
-        return buildLogPath;
+        return this.buildLogPath;
     }
 
     public static class Execution extends AbstractSynchronousNonBlockingStepExecution<BuildInfo> {
@@ -151,7 +151,7 @@ public class RunCommandStep extends AbstractStepImpl {
 
         @Override
         public String getFunctionName() {
-            return "RunConanCommand";
+            return "runConanCommand";
         }
 
         @Override
