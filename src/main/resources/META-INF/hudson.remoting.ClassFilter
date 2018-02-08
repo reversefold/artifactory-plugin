@@ -1,4 +1,7 @@
 # Safe, no deserialization, only basic types
+com.fasterxml.jackson.core.JsonLocation
+com.fasterxml.jackson.databind.JsonMappingException$Reference
+
 org.jfrog.build.client.artifactoryXrayResponse.ArtifactoryXrayResponse
 org.jfrog.build.client.artifactoryXrayResponse.Summary
 org.jfrog.build.client.DeployDetails

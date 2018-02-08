@@ -7,7 +7,6 @@ import hudson.FilePath;
 import hudson.Launcher;
 import hudson.model.Run;
 import hudson.model.TaskListener;
-import hudson.remoting.Callable;
 import hudson.util.ArgumentListBuilder;
 import jenkins.security.MasterToSlaveCallable;
 import org.apache.commons.lang.StringUtils;

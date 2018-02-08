@@ -2,7 +2,6 @@ package org.jfrog.hudson.pipeline.docker.proxy;
 
 import hudson.FilePath;
 import hudson.model.Node;
-import hudson.remoting.Callable;
 import jenkins.model.Jenkins;
 import jenkins.security.MasterToSlaveCallable;
 import net.lightbody.bmp.mitm.PemFileCertificateSource;

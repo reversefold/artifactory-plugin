@@ -18,7 +18,6 @@ package org.jfrog.hudson.util;
 
 import hudson.AbortException;
 import hudson.EnvVars;
-import hudson.FilePath;
 import hudson.maven.MavenEmbedderException;
 import hudson.maven.MavenEmbedderUtils;
 import hudson.maven.MavenModuleSet;
@@ -115,10 +114,12 @@ public class MavenVersionHelper {
             BuildListener listener) throws IOException, InterruptedException {
         final Maven.MavenInstallation installation = getMavenInstallation(build, vars, listener);
         final String home = installation.getHome();
-
+        if (build.getWorkspace() == null) {
+            throw new IllegalStateException("build.getWorkspace() is null");
+        }
         return build.getWorkspace().act(new MasterToSlaveCallable<String, IOException>() {
-            @Override
-            public String call() throws IOException {
+             @Override
+             public String call() throws IOException {
                 try {
                     return MavenEmbedderUtils.getMavenVersion(new File(home)).getVersion();
                 } catch (MavenEmbedderException e) {

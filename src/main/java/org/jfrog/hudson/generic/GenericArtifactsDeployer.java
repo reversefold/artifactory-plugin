@@ -76,7 +76,7 @@ public class GenericArtifactsDeployer {
             String spec = SpecUtils.getSpecStringFromSpecConf(configurator.getUploadSpec(), env, workingDir, listener.getLogger());
             artifactsToDeploy = workingDir.act(new FilesDeployerCallable(listener, spec, artifactoryServer,
                     credentialsConfig.getCredentials(build.getParent()), propertiesToAdd,
-                    artifactoryServer.createProxyConfiguration(Jenkins.getInstance().proxy)));
+                    ArtifactoryServer.createProxyConfiguration(Jenkins.getInstance().proxy)));
         } else {
             String deployPattern = Util.replaceMacro(configurator.getDeployPattern(), env);
             deployPattern = StringUtils.replace(deployPattern, "\r\n", "\n");
@@ -88,7 +88,7 @@ public class GenericArtifactsDeployer {
             String repositoryKey = Util.replaceMacro(configurator.getRepositoryKey(), env);
             artifactsToDeploy = workingDir.act(new FilesDeployerCallable(listener, pairs, artifactoryServer,
                     credentialsConfig.getCredentials(build.getParent()), repositoryKey, propertiesToAdd,
-                    artifactoryServer.createProxyConfiguration(Jenkins.getInstance().proxy)));
+                    ArtifactoryServer.createProxyConfiguration(Jenkins.getInstance().proxy)));
         }
     }
 

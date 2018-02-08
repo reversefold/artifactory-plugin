@@ -3,7 +3,6 @@ package org.jfrog.hudson.pipeline.docker.proxy;
 import hudson.Extension;
 import hudson.model.Computer;
 import hudson.model.TaskListener;
-import hudson.remoting.Callable;
 import hudson.slaves.ComputerListener;
 import jenkins.security.MasterToSlaveCallable;
 import org.jfrog.hudson.pipeline.Utils;

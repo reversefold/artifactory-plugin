@@ -1,11 +1,9 @@
 package org.jfrog.hudson.pipeline.docker.utils;
 
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimap;
 import hudson.Launcher;
 import hudson.model.Node;
 import hudson.model.TaskListener;
-import hudson.remoting.Callable;
 import jenkins.model.Jenkins;
 import jenkins.security.MasterToSlaveCallable;
 import org.apache.commons.lang.StringUtils;
